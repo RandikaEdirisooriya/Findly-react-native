@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+
+
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -9,61 +11,134 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { getAIResponse } from "../services/GeminiService";
+import BottomNavigation from "@/components/BottomNavigation";
+import { db } from "../firebaseConfig";
+import { collection, getDocs } from "firebase/firestore";
+import { useEffect } from "react";
+import { getAddressFromCoords } from "../services/geocodingService"; 
 export default function Chat() {
+  const [items, setItems] = useState<Item[]>([]);
+
+  interface Item {
+    id: string;
+    itemName: string;
+    location: { latitude: number; longitude: number }; // Location as object
+    contact: string;
+    imageBase64: string;
+    address: string;
+  }
+
+ useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "findly-items"));
+        const fetchedItems: Item[] = await Promise.all(
+          querySnapshot.docs.map(async (doc) => {
+            const data = doc.data() as Item;
+
+            if (
+              !data.location ||
+              typeof data.location.latitude !== "number" ||
+              typeof data.location.longitude !== "number"
+            ) {
+              console.warn(`Missing or invalid location data for item ID: ${doc.id}`);
+              return { ...data, id: doc.id, address: "Location not available" };
+            }
+
+            const address = await getAddressFromCoords(data.location.latitude, data.location.longitude);
+            return { ...data, id: doc.id, address };
+          })
+        );
+
+        setItems(fetchedItems);
+      } catch (error) {
+        console.error("Error fetching items:", error);
+      }
+    };
+
+    fetchItems();
+  }, []);
+
   interface MessageProps {
     text: string;
     isUser: boolean;
   }
 
   const Message: React.FC<MessageProps> = ({ text, isUser }) => (
-    <View style={[styles.message, isUser ? styles.userMessage : styles.botMessage]}>
-      <Text style={[styles.messageText, isUser ? styles.userMessageText : styles.botMessageText]}>
+    <View
+      style={[styles.message, isUser ? styles.userMessage : styles.botMessage]}
+    >
+      <Text
+        style={[
+          styles.messageText,
+          isUser ? styles.userMessageText : styles.botMessageText,
+        ]}
+      >
         {text}
       </Text>
     </View>
   );
 
-  const [message, setMessage] = useState<string>('');
+  const [message, setMessage] = useState<string>("");
   const [messages, setMessages] = useState<MessageProps[]>([
     {
-      text: "Hello! I'm your AI assistant. How can I help you find your lost item?",
+      text: "Hello! I'm your AI assistant. How can I help you?",
       isUser: false,
     },
   ]);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (message.trim()) {
-      setMessages((prevMessages) => [...prevMessages, { text: message, isUser: true }]);
-      setMessage('');
+      const userMessage = { text: message, isUser: true };
+      setMessages((prevMessages) => [...prevMessages, userMessage]);
+      setMessage("");
       Keyboard.dismiss();
-
-      setTimeout(() => {
+  
+      try {
+        // Filter items based on message
+        const matchedItems = items.filter(item =>
+          message.toLowerCase().includes(item.itemName.toLowerCase())
+        );
+  
+        let additionalInfo = "";
+        if (matchedItems.length > 0) {
+          additionalInfo = matchedItems.map(item => 
+            `\n\n📌 *${item.itemName}*\n📍 Address: ${item.address}\n📞 Contact: ${item.contact}`
+          ).join("\n");
+        }
+  
+        const aiResponse = await getAIResponse(message);
+        const responseText = aiResponse + additionalInfo;
+  
         setMessages((prevMessages) => [
           ...prevMessages,
-          {
-            text: "I'll help you locate your item. Can you provide more details about when and where you last saw it?",
-            isUser: false,
-          },
+          { text: responseText, isUser: false },
         ]);
-      }, 1000);
+      } catch (error) {
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          { text: "AI is unavailable at the moment.", isUser: false },
+        ]);
+      }
     }
   };
+  
 
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Findly AI Assistant</Text>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardAvoid}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         <ScrollView
           style={styles.messagesContainer}
-          contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+          contentContainerStyle={{ flexGrow: 1, justifyContent: "flex-end" }}
           keyboardShouldPersistTaps="handled"
         >
           {messages.map((msg, index) => (
@@ -85,6 +160,7 @@ export default function Chat() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      <BottomNavigation/>
     </SafeAreaView>
   );
 }
@@ -92,14 +168,14 @@ export default function Chat() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#d2d7d7',
+    backgroundColor: "#1c1c1e",
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    fontWeight: "bold",
+    color: "#fff",
     padding: 20,
-    textAlign: 'center',
+    textAlign: "center",
   },
   keyboardAvoid: {
     flex: 1,
@@ -110,44 +186,39 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   message: {
-    maxWidth: '80%',
+    maxWidth: "80%",
     padding: 12,
     borderRadius: 12,
     marginBottom: 12,
   },
   userMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#6c63ff',
+    alignSelf: "flex-end",
+    backgroundColor: "#6c63ff",
   },
   botMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    alignSelf: "flex-start",
+    backgroundColor: "#AEAEB0F2",
   },
   messageText: {
     fontSize: 16,
   },
   userMessageText: {
-    color: '#fff',
+    color: "#fff",
   },
   botMessageText: {
-    color: '#1a1a1a',
+    color: "#1a1a1a",
   },
   inputContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: "#27272AF2",
     borderTopWidth: 1,
-    borderColor: '#ddd',
-    alignItems: 'center',
+    borderColor: "#0000",
+    alignItems: "center",
   },
   input: {
     flex: 1,
-    backgroundColor: '#f0f0f3',
+    backgroundColor: "#36363AF2",
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -158,14 +229,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#6c63ff',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#6c63ff",
+    justifyContent: "center",
+    alignItems: "center",
     marginLeft: 8,
-    shadowColor: '#6c63ff',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
 });
