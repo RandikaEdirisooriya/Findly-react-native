@@ -152,7 +152,7 @@ export default function Chat() {
             value={message}
             onChangeText={setMessage}
             placeholder="Type your message..."
-            placeholderTextColor="#999"
+            placeholderTextColor="#fff"
             multiline
           />
           <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
@@ -223,7 +223,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     fontSize: 16,
+    fontWeight: "bold",
     maxHeight: 100,
+    color: "#fff",
   },
   sendButton: {
     width: 44,

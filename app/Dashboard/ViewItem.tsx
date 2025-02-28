@@ -30,7 +30,7 @@ export default function ViewItem() {
         querySnapshot.docs.map(async (doc) => {
           const data = doc.data() as Item;
           const address = await getAddressFromCoords(data.location.latitude, data.location.longitude);
-          console.log("Address:", address);
+        
           return { ...data, id: doc.id, address };
         })
       );

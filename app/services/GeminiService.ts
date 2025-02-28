@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import "react-native-get-random-values"; // React Native support ekata oni
 
-const API_KEY = "AIzaSyAv4LhIhdDt4yuN5fnHa5M5-42LGg2bZxY"; // API key eka mekata daganna
+const API_KEY = ""; // API key eka mekata daganna
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-pro" });

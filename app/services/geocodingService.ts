@@ -1,4 +1,4 @@
-const API_KEY = "a79a75a7c5b44740923f173cee65d45e"; // 🔴 Replace with your actual OpenCage API key
+const API_KEY = ""; // 🔴 Replace with your actual OpenCage API key
 
 export const getAddressFromCoords = async (latitude: number, longitude: number) => {
   try {
